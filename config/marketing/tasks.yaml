@@ -1,0 +1,20 @@
+tasks:
+  - name: research_topic
+    description: Research the latest marketing strategies and trends related to {topic}
+    agent: researcher
+    expected_output: A comprehensive report on the latest marketing strategies and trends related to the topic
+    context: []
+
+  - name: develop_strategy
+    description: Develop a comprehensive marketing strategy based on the research findings for {topic}
+    agent: strategist
+    expected_output: A detailed strategic marketing plan with actionable recommendations
+    context: 
+      - research_topic
+
+  - name: create_content
+    description: Create engaging marketing content based on the developed strategy for {topic}
+    agent: content_creator
+    expected_output: High-quality, engaging marketing content that implements the strategic recommendations
+    context:
+      - develop_strategy

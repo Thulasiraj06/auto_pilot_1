@@ -1,0 +1,20 @@
+tasks:
+  - name: analyze_market
+    description: Analyze the market conditions and identify sales opportunities related to {topic}
+    agent: market_analyst
+    expected_output: A detailed market analysis report with identified sales opportunities
+    context: []
+
+  - name: develop_sales_strategy
+    description: Develop effective sales strategies based on the market analysis for {topic}
+    agent: sales_strategist
+    expected_output: A comprehensive sales strategy with specific tactics and approaches
+    context:
+      - analyze_market
+
+  - name: create_sales_pitch
+    description: Create compelling sales pitches and materials based on the developed strategy for {topic}
+    agent: pitch_creator
+    expected_output: Persuasive sales pitches and materials ready for implementation
+    context:
+      - develop_sales_strategy
