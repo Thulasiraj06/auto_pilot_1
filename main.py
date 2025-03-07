@@ -1,118 +1,97 @@
-import os
-import uvicorn
-from fastapi import FastAPI, HTTPException
+http://127.0.0.1:8000/run_crew/0from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional
 from dotenv import load_dotenv
-import yaml
+import os
 import importlib
+import uvicorn
+import glob
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Check if OpenAI API key is set
+# Check if OpenAI API key is available
 if not os.getenv("OPENAI_API_KEY"):
-    print("Warning: OPENAI_API_KEY not found in environment variables. Please add it to the .env file.")
+    print("Warning: OPENAI_API_KEY not found in environment variables. Please set it in the .env file.")
 
 app = FastAPI(title="CrewAccess API")
 
-# Define available crews
-AVAILABLE_CREWS = [
+# List to store available crews
+crews = [
     {"id": 0, "name": "marketing_crew", "description": "Access the marketing_crew functionality"},
     {"id": 1, "name": "sales_crew", "description": "Access the sales_crew functionality"}
 ]
 
-def get_crew_module(crew_id: int):
-    """Get the appropriate crew module based on the crew_id"""
-    crew_modules = {
-        0: ("crews.marketing.marketing", "MarketingCrew"),
-        1: ("crews.sales.sales", "SalesCrew")
-    }
-    
-    if crew_id not in crew_modules:
-        return None
-    
-    module_path, class_name = crew_modules[crew_id]
-    try:
-        module = importlib.import_module(module_path)
-        crew_class = getattr(module, class_name)
-        return crew_class
-    except (ImportError, AttributeError) as e:
-        print(f"Error loading crew module: {e}")
-        return None
-
 @app.get("/")
-async def root():
-    """Root endpoint that provides information about the API"""
-    crew_list = [f"{crew['id']}: {crew['name']}" for crew in AVAILABLE_CREWS]
+def read_root():
     return {
         "message": "Welcome to CrewAccess API",
-        "available_crews": crew_list,
+        "available_crews": [f"{crew['id']}: {crew['name']}" for crew in crews],
         "usage": "To run a crew, use: /run_crew/{crew_id}?topic=your_topic"
     }
 
 @app.get("/crews")
-async def list_crews():
-    """List all available crews"""
-    return {"crews": AVAILABLE_CREWS}
+def get_crews():
+    return {"crews": crews}
 
 @app.get("/run_crew/{crew_id}")
-async def run_crew(crew_id: int, topic: Optional[str] = None):
-    """Run a specific crew with the given topic"""
-    # Check if crew_id is valid
-    crew_ids = [crew["id"] for crew in AVAILABLE_CREWS]
-    if crew_id not in crew_ids:
-        crew_list = [f"{crew['id']}: {crew['name']}" for crew in AVAILABLE_CREWS]
+def run_crew(crew_id: int, topic: str = Query(None)):
+    # Find the requested crew
+    crew_info = next((crew for crew in crews if crew["id"] == crew_id), None)
+    
+    # If crew not found, return error with available crews
+    if not crew_info:
         return JSONResponse(
             status_code=404,
             content={
                 "status": "error",
                 "message": f"No crew assigned for ID {crew_id}",
-                "available_crews": crew_list
+                "available_crews": [f"{crew['id']}: {crew['name']}" for crew in crews]
             }
         )
     
-    # Check if topic is provided
-    if not topic:
+    # If topic is not provided, return the crew information
+    if topic is None:
         return JSONResponse(
-            status_code=400,
-            content={
-                "status": "error",
-                "message": "Topic parameter is required",
-                "example": f"/run_crew/{crew_id}?topic=Digital%20Marketing"
-            }
+            status_code=200,
+            content=crew_info
         )
     
-    # Get the appropriate crew module
-    crew_class = get_crew_module(crew_id)
-    if not crew_class:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "message": f"Failed to load crew module for ID {crew_id}"
-            }
-        )
-    
+    # Process the crew based on ID
     try:
-        # Instantiate and run the crew
-        crew_instance = crew_class(topic)
-        result = crew_instance.run()
+        result = None
         
+        if crew_id == 0:
+            # Marketing crew
+            from crews.marketing.marketing import run_marketing_crew
+            result = run_marketing_crew(topic)
+        elif crew_id == 1:
+            # Sales crew
+            from crews.sales.sales import run_sales_crew
+            result = run_sales_crew(topic)
+        
+        # Return result in consistent format
         return {
             "status": "success",
             "crew_id": crew_id,
             "topic": topic,
             "result": result
         }
+    
     except Exception as e:
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": f"Error executing crew: {str(e)}"
+                "message": f"Error executing crew: {str(e)}",
+                "example": f"/run_crew/{crew_id}?topic=Digital%20Marketing"
             }
         )
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    print("Starting CrewAccess API...")
+    print("Available crews:")
+    for crew in crews:
+        print(f"  {crew['id']}: {crew['name']} - {crew['description']}")
+    
+    uvicorn.run(app, host="127.0.0.1", port=8000)
